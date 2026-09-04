@@ -54,7 +54,8 @@ module direct_mapped_cache (
     assign hit = valid_bit[addr_index] && (tag_ram[addr_index] == addr_tag);
 endmodule
 /*
-
+Option 1: assign rdata = data_ram[addr_index];
+Cache sends data on bth cases of  *hit* or *miss*. CPU writes the logic if (hit) accept if(miss) reject
                   ┌──────────────────────┐
                   │  Cache Controller    │
                   └──────────┬───────────┘
@@ -74,4 +75,10 @@ Scenario 2: hit == 0 (Cache Miss)
 rdata contains old garbage or stale data from a previous address (e.g., 32'hAABBCCDD).
 The CPU sees hit == 0.
 The CPU completely ignores rdata. It does not write rdata into any register.
-The CPU stalls its pipeline and sends a request out to Main Memory to fetch the real data.*/
+The CPU stalls its pipeline and sends a request out to Main Memory to fetch the real data.
+
+
+Option-2 
+Assign d_out = hit? d_ram [addr_ind] : 32'd0
+
+based on *hit* / *miss* the cache will decide wheather to send the data to the cpu*/
