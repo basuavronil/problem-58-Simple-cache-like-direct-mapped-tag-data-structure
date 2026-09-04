@@ -52,3 +52,25 @@ module direct_mapped_cache (
     assign rdata = data_ram[addr_index];
     assign hit = valid_bit[addr_index] && (tag_ram[addr_index] == addr_tag);
 endmodule
+/*
+
+                  ┌──────────────────────┐
+                  │  Cache Controller    │
+                  └──────────┬───────────┘
+                             │
+            ┌────────────────┴────────────────┐
+            ▼                                 ▼
+       `hit` Signal                      `rdata` Bus
+      (1 bit flag)                     (32 bits data)
+Scenario 1: hit == 1 (Cache Hit)
+
+rdata contains valid cached data (e.g., 32'h12345678).
+
+The CPU sees hit == 1.
+The CPU accepts rdata and saves it into a register.
+
+Scenario 2: hit == 0 (Cache Miss)
+rdata contains old garbage or stale data from a previous address (e.g., 32'hAABBCCDD).
+The CPU sees hit == 0.
+The CPU completely ignores rdata. It does not write rdata into any register.
+The CPU stalls its pipeline and sends a request out to Main Memory to fetch the real data.*/
