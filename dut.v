@@ -1,3 +1,4 @@
+// (PIPT) -> Physically Indexed Physically Tagged (l2, l3)
 // Direct-Mapped Cache Tag/Data Structure (256 Lines x 32-Bit Words)
 module direct_mapped_cache (
     input  wire        clk,
