@@ -1,17 +1,16 @@
 `timescale 1ns / 1ps
 
-module tb_direct_mapped_cache;
+module direct_mapped_cache_tb;
 
-    reg         clk;
-    reg         rst_n;
+    reg        clk;
+    reg        rst_n;
     reg  [31:0] addr;
     reg  [31:0] wdata;
-    reg         write_en;
-
+    reg        write_en;
     wire [31:0] rdata;
-    wire        hit;
+    wire       hit;
 
-    // Instantiate UUT
+    // Instantiate the Direct-Mapped Cache DUT
     direct_mapped_cache uut (
         .clk(clk),
         .rst_n(rst_n),
@@ -22,52 +21,72 @@ module tb_direct_mapped_cache;
         .hit(hit)
     );
 
-    // Clock Generator (100 MHz)
-    initial clk = 0;
+    // Waveform dump configuration for EPWave / GTKWave
+    initial begin
+        $dumpfile("dump.vcd");
+        $dumpvars(0, direct_mapped_cache_tb);
+    end
+
+    // Real-time terminal output monitor
+    initial begin
+        $monitor("[%0t ns] rst_n=%b | addr=0x%h (Tag: 0x%h, Index: %0d) | write_en=%b wdata=0x%h | hit=%b rdata=0x%h",
+                 $time, rst_n, addr, addr[31:12], addr[11:4], write_en, wdata, hit, rdata);
+    end
+
+    // 100MHz clock generation (10ns period)
     always #5 clk = ~clk;
 
     initial begin
-        rst_n    = 0;
-        addr     = 32'h0;
-        wdata    = 32'h0;
+        // 1. Initialize Signals and Assert Active-Low Reset
+        clk      = 0;
+        rst_n    = 0; // Assert Active-Low Reset
+        addr     = 0;
+        wdata    = 0;
         write_en = 0;
 
-        #20;
-        rst_n = 1;
-        #20;
-
-        // ---------------------------------------------------------
-        // Test 1: Cold Miss on Address 0x12345080
-        // ---------------------------------------------------------
-        addr = 32'h12345080; 
-        #10;
-        $display("[TEST 1] Addr: 0x%h | Hit: %b | Expected: 0 (Miss)", addr, hit);
-
-        // ---------------------------------------------------------
-        // Test 2: Line Fill / Write Data to Address 0x12345080
-        // ---------------------------------------------------------
+        // Hold reset across clock edge to clear valid bits
         @(posedge clk);
-        write_en <= 1'b1;
-        wdata    <= 32'hABCD_1234;
+        #1;
+        rst_n = 1; // Release Reset
+
+        // 2. Test Cache Miss (Read uninitialized address 0x12345040)
+        // Tag = 0x12345, Index = 4
+        addr = 32'h12345040;
+        #5;
+        // Expected: hit = 0 (Cache Miss)
+
+        // 3. Write Line Fill into Cache (Store data 0xDEADBEEF at address 0x12345040)
         @(posedge clk);
-        write_en <= 1'b0;
+        write_en = 1;
+        wdata    = 32'hDEADBEEF;
 
-        // ---------------------------------------------------------
-        // Test 3: Read back Address 0x12345080 (Should Hit!)
-        // ---------------------------------------------------------
-        addr = 32'h12345080;
+        // 4. Disable write & Test Cache Hit on the same address
+        @(posedge clk);
+        write_en = 0;
+        #5;
+        // Expected: hit = 1 (Cache Hit), rdata = 0xDEADBEEF
+
+        // 5. Test Tag Conflict (Cache Miss on same index 4, but different Tag 0x99999)
+        addr = 32'h99999040; // Same index 4, different tag
+        #5;
+        // Expected: hit = 0 (Cache Miss due to tag mismatch)
+
+        // 6. Overwrite Index 4 with New Tag 0x99999 and New Data 0xCAFEBABE
+        @(posedge clk);
+        write_en = 1;
+        wdata    = 32'hCAFEBABE;
+
+        @(posedge clk);
+        write_en = 0;
+        #5;
+        // Expected: hit = 1 (Cache Hit), rdata = 0xCAFEBABE
+
+        // 7. Verify Old Address 0x12345040 now results in a Cache Miss (Eviction check)
+        addr = 32'h12345040;
+        #5;
+        // Expected: hit = 0 (Evicted)
+
         #10;
-        $display("[TEST 3] Addr: 0x%h | Hit: %b | Data: 0x%h | Expected: Hit with 0xABCD1234", 
-                  addr, hit, rdata);
-
-        // ---------------------------------------------------------
-        // Test 4: Same Index (0x80), Different Tag (Conflict Miss)
-        // ---------------------------------------------------------
-        addr = 32'h99999080; // Same index [11:4] = 0x08, Tag changes to 0x99999
-        #10;
-        $display("[TEST 4] Addr: 0x%h | Hit: %b | Expected: 0 (Conflict Miss)", addr, hit);
-
-        #50;
         $finish;
     end
 
